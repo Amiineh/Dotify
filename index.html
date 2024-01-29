@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Canvas Project</title>
+    <link rel="stylesheet" type="text/css" href="style.css">
+    <script src="https://cdn.jsdelivr.net/gh/kchapelier/poisson-disk-sampling@2.3.1/build/poisson-disk-sampling.min.js"></script>
+</head>
+<body>
+    <button id="imageButton">Image</button>
+    <button id="textButton">Text</button>
+    <button id="patternButton">Pattern</button>
+
+    <div id="exportButtonsContainer">
+        <button id="exportPng">Export PNG</button>
+        <button id="exportJpeg">Export JPEG</button>
+        <button id="exportSvg">Export SVG</button>
+    </div>    
+
+    <!-- <div id="colorControls">
+        <label for="foregroundColor">Foreground Color:</label>
+        <input type="color" id="foregroundColor" value="#000000">
+        
+        <label for="hexColor">HEX:</label>
+        <input type="text" id="hexColor" value="#000000" pattern="^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$">
+    </div> -->
+    
+    
+    <div id="imageMenu" class="menu" style="display: none;">
+        <h3>Image Controls</h3>
+        <input type="file" id="imagePicker" accept="image/*">
+        <label for="dotSize">Dot Size:</label>
+        <input type="range" id="dotSize" min="1" max="5" value="2" step="0.2">
+        <label for="density">Density:</label>
+        <input type="range" id="density" min="1" max="10" value="4">
+        <input type="color" id="foregroundColor" value="#000000">
+        <input type="color" id="backgroundColor" value="#FFFFFF">
+        <button id="applyImage">Apply</button>
+    </div>
+
+    <div id="textMenu" class="menu" style="display: none;">
+        <h3>Text Controls</h3>
+        <label for="width">width:</label>
+        <input type="number" id="width" min="100" max="1000" value="500">
+        <label for="height">height:</label>
+        <input type="number" id="height" min="100" max="1000" value="300">
+        <input type="text" id="textInput" placeholder="Enter text">
+        <label for="fontSize">Font Size:</label>
+        <input type="number" id="fontSize" min="50" max="500" value="100">
+        <label for="dotSize">Dot Size:</label>
+        <input type="range" id="dotSizeText" min="1" max="5" value="2" step="0.2">
+        <label for="maxDistText">Dot Max Dist:</label>
+        <input type="range" id="maxDistText" min="10" max="200" value="50">
+        <label for="density">Density:</label>
+        <input type="range" id="densityText" min="1" max="10" value="4">
+        <input type="color" id="foregroundColorText" value="#000000">
+        <input type="color" id="backgroundColorText" value="#FFFFFF">
+        <button id="applyText">Apply</button>
+    </div>
+
+    <div id="patternMenu" class="menu" style="display: none;">
+        <h3>Pattern Controls</h3>
+        <label for="widthPattern">width:</label>
+        <input type="number" id="widthPattern" min="100" max="1000" value="500">
+        <label for="heightPattern">height:</label>
+        <input type="number" id="heightPattern" min="100" max="1000" value="300">
+        <label for="dotSizePattern">Dot Size:</label>
+        <input type="range" id="dotSizePattern" min="1" max="5" value="2" step="0.2">
+        <label for="minDist">Dot min dist:</label>
+        <input type="range" id="minDist" min="0.04" max="0.1" value="0.05" step="0.01">
+        <label for="patternSize">Pattern Density:</label>
+        <input type="range" id="patternSize" min="1" max="10" value="5">
+        <input type="color" id="foregroundColorPattern" value="#000000">
+        <input type="color" id="backgroundColorPattern" value="#FFFFFF">
+        <label for="bgImage">Background Image:</label>
+        <input type="file" id="bgImage" accept="image/*">
+        <button id="generatePattern">Generate</button>
+    </div>
+
+    <canvas id="myCanvas" ></canvas>
+    <script type="module" src="src/app.js" defer></script>
+</body>
+</html>
