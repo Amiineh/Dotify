@@ -123,15 +123,6 @@ document.addEventListener('DOMContentLoaded', () => {
     svgElem.setAttributeNS(null, 'width', `${boxWidth}`);
     svgElem.setAttributeNS(null, 'height', `${boxHeight}`);
 
-    // for (let i = 0; i< particles.length; i++){
-    //   const particle = particles[i]
-    //   const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
-    //   circle.setAttribute('cx', `${particle.x}`)  // x-coordinate of the center
-    //   circle.setAttribute('cy', `${particle.y}`)  // y-coordinate of the center
-    //   circle.setAttribute('r', `${particle.r}`)    // radius
-    //   circle.setAttribute('fill', `${particle.color}`) // fill color
-    //   svgElem.append(circle)
-    // }
     particles.forEach(particle => {
       // console.log(particle);
       const circle = document.createElementNS(xmlns, 'circle');
@@ -159,13 +150,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Clean up
     URL.revokeObjectURL(link.href);
 
-
-    // // Assuming you have a p5.js-svg instance
-    // // Replace with your actual p5.js-svg instance or method to get the SVG content
-    // const svgContent = myP5Instance._renderer.svg.outerHTML;
-    // const blob = new Blob([svgContent], {type: 'image/svg+xml'});
-    // const url = URL.createObjectURL(blob);
-    // download(url, 'canvas.svg');
   });
 
   function download(url, filename) {
