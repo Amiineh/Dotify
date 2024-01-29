@@ -10,6 +10,12 @@ Dotify is an interactive web application that transforms images, text, and patte
 - **Export Options**: Save your artwork in PNG, JPEG, and SVG formats.
 - **Interactive Controls**: Real-time adjustments for all parameters to fine-tune your art.
 
+## Project screenshots
+
+![image](./sample-images/image.png)
+![text](./sample-images/text.png)
+![pattern](./sample-images/pattern.png)
+
 ## Getting Started
 
 ### Prerequisites
