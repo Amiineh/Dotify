@@ -32,7 +32,7 @@ Dotify is an interactive web application that transforms images, text, and patte
    
 4. Run the Application
    ```bash
-   npm run
+   npm start
    ```
 
 ### Usage
