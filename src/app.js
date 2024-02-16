@@ -1,6 +1,6 @@
 // app.js
-
-import {Poisson2D} from "./moore.js"
+// import p5 from "p5";
+import {Poisson2D} from "./moore.js";
 
 let currentImageSrc = null;
 let currentText = null;
@@ -45,6 +45,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // image controls
+    document.getElementById('dotSize').addEventListener('change', processImage.bind(this));
+    document.getElementById('density').addEventListener('change', processImage.bind(this));
+    document.getElementById('maxDistImage').addEventListener('change', processImage.bind(this));
+    document.getElementById('foregroundColor').addEventListener('change', processImage.bind(this));
+    document.getElementById('backgroundColor').addEventListener('change', processImage.bind(this));
     const imageInput = document.getElementById("imagePicker");
     const applyImage = document.getElementById("applyImage");
 
@@ -66,6 +71,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // text controls
+    document.getElementById('width').addEventListener('change', processText.bind(this));
+    document.getElementById('height').addEventListener('change', processText.bind(this));
+    document.getElementById('fontSize').addEventListener('change', processText.bind(this));
+    document.getElementById('dotSizeText').addEventListener('change', processText.bind(this));
+    document.getElementById('maxDistText').addEventListener('change', processText.bind(this));
+    document.getElementById('densityText').addEventListener('change', processText.bind(this));
+    document.getElementById('foregroundColorText').addEventListener('change', processText.bind(this));
+    document.getElementById('backgroundColorText').addEventListener('change', processText.bind(this));
     const textInput = document.getElementById("textInput");
     const applyText = document.getElementById("applyText");
 
@@ -81,6 +94,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // pattern controls
+    document.getElementById('widthPattern').addEventListener('change', generatePattern.bind(this));
+    document.getElementById('heightPattern').addEventListener('change', generatePattern.bind(this));
+    document.getElementById('dotSizePattern').addEventListener('change', generatePattern.bind(this));
+    document.getElementById('minDist').addEventListener('change', generatePattern.bind(this));
+    document.getElementById('patternSize').addEventListener('change', generatePattern.bind(this));
+    document.getElementById('foregroundColorPattern').addEventListener('change', generatePattern.bind(this));
+    document.getElementById('backgroundColorPattern').addEventListener('change', generatePattern.bind(this));
     const bgImage = document.getElementById("bgImage");
     const generateButton = document.getElementById("generatePattern");
 
@@ -92,7 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
           };
           reader.readAsDataURL(event.target.files[0]);
       }
-  });
+    });
 
   generateButton.addEventListener("click", function(){
     generatePattern();
@@ -190,7 +210,34 @@ function generatePattern(){
       reader.onload = function(e) {
           const img = new Image();
           img.onload = function() {
-              context.drawImage(img, 0, 0, canvas.width, canvas.height);
+            // Calculate the aspect ratios of the image and the canvas
+            const imgAspectRatio = img.width / img.height;
+            const canvasAspectRatio = canvas.width / canvas.height;
+
+            let drawWidth, drawHeight, offsetX, offsetY;
+
+            // If image's aspect ratio is greater than canvas's aspect ratio
+            if (imgAspectRatio > canvasAspectRatio) {
+                // Image is wider than canvas, scale by height and crop the width
+                drawHeight = canvas.height;
+                drawWidth = img.width * (canvas.height / img.height);
+                offsetX = (canvas.width - drawWidth) / 2;
+                offsetY = 0;
+            } else {
+                // Image is taller than canvas, scale by width and crop the height
+                drawWidth = canvas.width;
+                drawHeight = img.height * (canvas.width / img.width);
+                offsetX = 0;
+                offsetY = (canvas.height - drawHeight) / 2;
+            }
+
+            // Clear the canvas before drawing
+            context.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw the image with calculated dimensions and offsets
+            context.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+
+              // context.drawImage(img, 0, 0, canvas.width, canvas.height);
               drawPattern(context, canvasWidth, canvasHeight, dotSize, minDist, patternDensity, foregroundColor);
           };
           img.src = e.target.result;
@@ -201,75 +248,246 @@ function generatePattern(){
       context.fillRect(0, 0, canvas.width, canvas.height);
       drawPattern(context, canvasWidth, canvasHeight, dotSize, minDist, patternDensity, foregroundColor);
   }
+
 }
 
 function drawPattern(context, width, height, dotSize, minDist, patternDensity, foregroundColor) {
-  let asp = 1 / 1.4; // Aspect ratio
-  let extent = [-1, 1, -1 / asp, 1 / asp];
-  const pixelMapper = new PixelMapper(width, height);
-  pixelMapper.setExtentWidth(2);
+      // Assuming p5SVG is globally accessible or passed into this function
+      new p5((p) => {
+        class Perlin {
+          constructor(seed, range = 1, octaves = 4, falloff = 0.5) {
+              this.xOffset = Math.random() * 1000;
+              this.yOffset = Math.random() * 1000;
+              this.range = range;
+              this.octaves = octaves;
+              this.falloff = falloff;
+        
+              this.normConst = 0;
+              let ampl = 0.5;
+              for (let i = 0; i < octaves; i++) {
+                  this.normConst += ampl;
+                  ampl *= falloff;
+              }
+              this.permutation = [];
+              let i;
+              for (i = 0; i < 256; i++) {
+                this.permutation[i] = Math.floor(Math.random() * 256);
+              }
+              // Duplicate the permutation array
+              this.permutation = this.permutation.concat(this.permutation);
+          }
+        
+          ev(x, y) {
+              let total = 0;
+              let frequency = 1;
+              let amplitude = 1;
+              let maxValue = 0;
+              for(let i = 0; i < this.octaves; i++) {
+                  total += p.noise((x + this.xOffset) * frequency / this.range, 
+                                 (y + this.yOffset) * frequency / this.range) * amplitude;
+                  
+                  maxValue += amplitude;
+                  amplitude *= this.falloff;
+                  frequency *= 2;
+              }
+              return total / maxValue;
+          }
+        }
 
-  const seed = 5325 * Math.random();
-  const xNoise = new Perlin(5631 * seed, 0.5, 10, 0.5);
-  const yNoise = new Perlin(7242 * seed, 0.5, 10, 0.5);
 
-  // Define the extent of the area where circles will be generated
-  const circles = generateCircles(extent, 0.25, 0.5, Math.random);
-  const nCircles = circles.length;
+        let pixelMapper; // PixelMapper instance, define this class or function
+        let pds; // Poisson2D instance, define this class or function
 
-  const warpSizeX = Math.random(0.1, 1);
-  const warpSizeY = Math.random(0.1, 1);
-  const numWarps = Math.floor(Math.random(1, 10 + 1));
+        p.setup = () => {
+          p.createCanvas(width, height);
+          
+          let seed = 5325 * p.random();
+          let asp = 1 / 1.4; // Aspect ratio
+          let extent = [-1, 1, -1 / asp, 1 / asp];
 
-  // minDist = Math.random(0.004, 0.006);
+          pixelMapper = new PixelMapper(width, height);
+          pixelMapper.setExtentWidth(2);
 
-  const pds = new Poisson2D({
-    extent: extent,
-    minDistance: minDist,
-    maxDistance: minDist * Math.random(5, 10),
-    distanceFunction: function(pt) {
-      let [x, y] = pt;
-      let warpScale = 1;
-      for (let i = 0; i < numWarps; i++) {
-        const dx = -1 + 2 * xNoise.ev(x, y);
-        const dy = -1 + 2 * yNoise.ev(x, y);
-        x += warpScale * warpSizeX * dx;
-        y += warpScale * warpSizeY * dy;
-        warpScale *= 0.9;
-      }
-      for (let i = 0; i < nCircles; i++) {
-        const circ = circles[i];
-        const [cX, cY] = circ.center;
-        if (Math.hypot(cX - x, cY - y) < circ.radius) return circ.dist;
-      }
-      return 1;
-    },
-    tries: 10,
-}, Math.random);
-while (true){
-    let pt = pds.next();
-    if (!pt) break;
-    // console.log(pt, pixelMapper.toPixel(pt[0], pt[1]));
-    pt = pixelMapper.toPixel(pt[0], pt[1]);
-    let d = pds.getLastDistance();
-    let dCbrt = Math.pow(d, 1/3);
-    let idx = Math.floor(dCbrt*patternDensity);
-    // let idx = 0;
-    if (idx == 0){
 
-      context.fillStyle = foregroundColor;
-      let particle = new Particle(pt[0], pt[1], dotSize, foregroundColor);
-      particles.push(particle);
-      context.fillRect(
-        Math.round(pt[0]) - dotSize / 2,
-        Math.round(pt[1]) - dotSize / 2,
-        dotSize,
-        dotSize
-      );
-    }
-  }
-  console.log("out of while");
-}
+          p.noiseSeed(72 * seed);
+          let xNoise = new Perlin(5631 * seed, 0.5, 10, 0.5);
+          let yNoise = new Perlin(7242 * seed, 0.5, 10, 0.5);
+
+          let circles = generateCircles(extent, 0.25, 0.5, Math.random);
+          const nCircles = circles.length;
+
+          const warpSizeX = p.random(0.1, 1);
+          const warpSizeY = p.random(0.1, 1);
+          const numWarps = p.floor(p.random(1, 10 + 1));
+
+          function distanceFunction(pt) {
+              let [x, y] = pt;
+              let warpScale = 1;
+              for (let i = 0; i < numWarps; i++) {
+                  const dx = -1 + 2 * xNoise.ev(x, y);
+                  const dy = -1 + 2 * yNoise.ev(x, y);
+
+                  x += warpScale * warpSizeX * dx;
+                  y += warpScale * warpSizeY * dy;
+
+                  warpScale *= 0.9;
+              }
+
+              for (let i = 0; i < nCircles; i++) {
+                  const circ = circles[i];
+                  const [cX, cY] = circ.center;
+                  if (Math.hypot(cX - x, cY - y) < circ.radius) return circ.dist;
+              }
+              return 1;
+          }
+
+          // const minDistance = p.random(0.004, 0.006);
+          const minDistance = minDist;
+          const maxDistance = minDistance * p.random(5, 10);
+
+          pds = new Poisson2D({
+              extent: extent,
+              minDistance: minDistance,
+              maxDistance: maxDistance,
+              distanceFunction,
+              tries: 10,
+          }, Math.random);
+
+          
+
+          // gfx.colorMode(p.HSL, 1);
+          // console.log(state.BG_mode)
+          // if (state.BG_mode === 'image') 
+          //     p.background(0, 0, 0, 0);
+          // else if (state.BG_mode === 'color')
+          //     p.background(backgroundColor); 
+      };
+
+      p.draw = () => {
+          let pointFill = foregroundColor;
+          p.stroke(pointFill);
+          // p.strokeWeight(s / 300);
+          p.strokeWeight(dotSize);
+
+          for (let i = 0; i < 100; i++) {
+              let pt = pds.next();
+              let d = pds.getLastDistance();
+              let dCbrt = Math.pow(d, 1/3);
+              if (!pt) {
+                      p.noLoop();
+                      return;
+              }
+              
+              let idx = Math.floor(dCbrt*patternDensity);
+              if (idx == 0){
+                  // p.point(...pixelMapper.toPixel(...pt));
+                  pt = pixelMapper.toPixel(pt[0], pt[1]);
+
+                  context.fillStyle = foregroundColor;
+                  let particle = new Particle(pt[0], pt[1], dotSize, foregroundColor);
+                  particles.push(particle);
+                  // context.fillRect(
+                  //   Math.round(pt[0]) - dotSize / 2,
+                  //   Math.round(pt[1]) - dotSize / 2,
+                  //   dotSize,
+                  //   dotSize
+                  // );
+                  context.beginPath(); // Start a new path
+                      context.arc(
+                          Math.round(pt[0]), // x-coordinate of the center of the circle
+                          Math.round(pt[1]), // y-coordinate of the center of the circle
+                          dotSize / 2, // Radius of the circle
+                          0, // Start angle
+                          2 * Math.PI // End angle
+                      );
+                      context.fill(); // Fill the path
+              }
+
+          }
+      };
+    }, 'myCanvas'); // 'myCanvas' might be a container ID where the canvas should be attached
+
+
+
+
+// function drawPattern(context, width, height, dotSize, minDist, patternDensity, foregroundColor) {
+//   let asp = 1 / 1.4; // Aspect ratio
+//   let extent = [-1, 1, -1 / asp, 1 / asp];
+//   const pixelMapper = new PixelMapper(width, height);
+//   pixelMapper.setExtentWidth(2);
+
+//   const seed = 5325 * Math.random();
+//   const xNoise = new Perlin(5631 * seed, 0.5, 10, 0.5);
+//   const yNoise = new Perlin(7242 * seed, 0.5, 10, 0.5);
+
+//   // Define the extent of the area where circles will be generated
+//   const circles = generateCircles(extent, 0.25, 0.5, Math.random);
+//   const nCircles = circles.length;
+
+//   const warpSizeX = Math.random(0.1, 1);
+//   const warpSizeY = Math.random(0.1, 1);
+//   const numWarps = Math.floor(Math.random(1, 10 + 1));
+
+//   // minDist = Math.random(0.004, 0.006);
+
+//   const pds = new Poisson2D({
+//     extent: extent,
+//     minDistance: minDist,
+//     maxDistance: minDist * Math.random(5, 10),
+//     distanceFunction: function(pt) {
+//       let [x, y] = pt;
+//       let warpScale = 1;
+//       for (let i = 0; i < numWarps; i++) {
+//         const dx = -1 + 2 * xNoise.ev(x, y);
+//         const dy = -1 + 2 * yNoise.ev(x, y);
+//         x += warpScale * warpSizeX * dx;
+//         y += warpScale * warpSizeY * dy;
+//         warpScale *= 0.9;
+//       }
+//       for (let i = 0; i < nCircles; i++) {
+//         const circ = circles[i];
+//         const [cX, cY] = circ.center;
+//         if (Math.hypot(cX - x, cY - y) < circ.radius) return circ.dist;
+//       }
+//       return 1;
+//     },
+//     tries: 10,
+// }, Math.random);
+
+// while (true){
+//     let pt = pds.next();
+//     if (!pt) break;
+//     // console.log(pt, pixelMapper.toPixel(pt[0], pt[1]));
+    
+//     let d = pds.getLastDistance();
+//     let dCbrt = Math.pow(d, 1/3);
+//     let idx = Math.floor(dCbrt*patternDensity);
+//     // let idx = 0;
+//     if (idx == 3){
+//       pt = pixelMapper.toPixel(pt[0], pt[1]);
+
+//       context.fillStyle = foregroundColor;
+//       let particle = new Particle(pt[0], pt[1], dotSize, foregroundColor);
+//       particles.push(particle);
+//       // context.fillRect(
+//       //   Math.round(pt[0]) - dotSize / 2,
+//       //   Math.round(pt[1]) - dotSize / 2,
+//       //   dotSize,
+//       //   dotSize
+//       // );
+//       context.beginPath(); // Start a new path
+//           context.arc(
+//               Math.round(pt[0]), // x-coordinate of the center of the circle
+//               Math.round(pt[1]), // y-coordinate of the center of the circle
+//               dotSize / 2, // Radius of the circle
+//               0, // Start angle
+//               2 * Math.PI // End angle
+//           );
+//           context.fill(); // Fill the path
+//     }
+//   }
+//   // console.log("particles: ", particles.length);
+// }
 
 // Helper functions and classes
 function generateCircles(extent, minRadius=0.1, maxRadius=2, rng) {
@@ -293,39 +511,8 @@ function generateCircles(extent, minRadius=0.1, maxRadius=2, rng) {
 }
 
 
-class Perlin {
-  constructor(seed, range = 1, octaves = 4, falloff = 0.5) {
-      this.xOffset = Math.random() * 1000;
-      this.yOffset = Math.random() * 1000;
-      this.range = range;
-      this.octaves = octaves;
-      this.falloff = falloff;
 
-      this.normConst = 0;
-      let ampl = 0.5;
-      for (let i = 0; i < octaves; i++) {
-          this.normConst += ampl;
-          ampl *= falloff;
-      }
-  }
-
-  ev(x, y) {
-      let total = 0;
-      let frequency = 1;
-      let amplitude = 1;
-      let maxValue = 0;
-      for(let i = 0; i < this.octaves; i++) {
-          total += noise((x + this.xOffset) * frequency / this.range, 
-                         (y + this.yOffset) * frequency / this.range) * amplitude;
-          
-          maxValue += amplitude;
-          amplitude *= this.falloff;
-          frequency *= 2;
-      }
-      return total / maxValue;
-  }
 }
-
 class PixelMapper {
   constructor(pixelWidth, pixelHeight) {
       this.size = [pixelWidth, pixelHeight];
@@ -424,12 +611,21 @@ function processText(){
     points.forEach(function(point) {
       let particle = new Particle(point[0], point[1], dotSize, foregroundColor);
       particles.push(particle);
-      context.fillRect(
-        Math.round(point[0]),
-        Math.round(point[1]),
-        dotSize,
-        dotSize
-      );
+      // context.fillRect(
+      //   Math.round(point[0]),
+      //   Math.round(point[1]),
+      //   dotSize,
+      //   dotSize
+      // );
+      context.beginPath(); // Start a new path
+          context.arc(
+              Math.round(point[0]), // x-coordinate of the center of the circle
+              Math.round(point[1]), // y-coordinate of the center of the circle
+              dotSize / 2, // Radius of the circle
+              0, // Start angle
+              2 * Math.PI // End angle
+          );
+          context.fill(); // Fill the path
     });
   });
 }
@@ -438,6 +634,7 @@ function processImage() {
   clearParticles();
     const dotSize = parseInt(document.getElementById("dotSize").value, 10);
     const density = parseInt(document.getElementById("density").value, 10);
+    const max_dist = parseInt(document.getElementById("maxDistImage").value, 10)
     const foregroundColor = document.getElementById("foregroundColor").value;
     const backgroundColor = document.getElementById("backgroundColor").value;
 
@@ -445,7 +642,7 @@ function processImage() {
         var pds = new PoissonDiskSampling({
             shape: [imageData.width, imageData.height],
             minDistance: density,
-            maxDistance: density * 5,
+            maxDistance: max_dist,
             tries: 30,
             distanceFunction: function(point) {
                 var pixelIndex = (Math.round(point[0]) + Math.round(point[1]) * imageData.width) * 4;
@@ -455,7 +652,7 @@ function processImage() {
 
         var points = pds.fill();
         var canvas = document.getElementById('myCanvas'),
-            context = canvas.getContext('2d');
+        context = canvas.getContext('2d');
 
         canvas.width = imageData.width;
         canvas.height = imageData.height;
@@ -468,12 +665,21 @@ function processImage() {
         points.forEach(function(point) {
           let particle = new Particle(point[0], point[1], dotSize, foregroundColor);
           particles.push(particle);
-          context.fillRect(
-                Math.round(point[0]),
-                Math.round(point[1]),
-                dotSize,
-                dotSize
-            );
+          // context.fillRect(
+          //       Math.round(point[0]),
+          //       Math.round(point[1]),
+          //       dotSize,
+          //       dotSize
+          //   );
+          context.beginPath(); // Start a new path
+          context.arc(
+              Math.round(point[0]), // x-coordinate of the center of the circle
+              Math.round(point[1]), // y-coordinate of the center of the circle
+              dotSize / 2, // Radius of the circle
+              0, // Start angle
+              2 * Math.PI // End angle
+          );
+          context.fill(); // Fill the path
         });
     });
 }
