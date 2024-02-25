@@ -4,6 +4,7 @@ import {Poisson2D} from "./moore.js";
 
 let currentImageSrc = null;
 let currentText = null;
+let currentSketch = null;
 let backgroundImage = null;
 let particles = [];
 const fontFile = 'XXAAVV83-Bold.ttf'
@@ -251,162 +252,238 @@ function generatePattern(){
 
 }
 
+function initSketch(context, width, height, dotSize, minDist, patternDensity, foregroundColor){
+  if (currentSketch !== null)
+    currentSketch.remove();
+  currentSketch = createSketch(context, width, height, dotSize, minDist, patternDensity, foregroundColor);
+}
+
+function createSketch(context, width, height, dotSize, minDist, patternDensity, foregroundColor){
+  return new p5((p) => {
+    class Perlin {
+      constructor(seed, range = 1, octaves = 4, falloff = 0.5) {
+          this.xOffset = Math.random() * 1000;
+          this.yOffset = Math.random() * 1000;
+          this.range = range;
+          this.octaves = octaves;
+          this.falloff = falloff;
+    
+          this.normConst = 0;
+          let ampl = 0.5;
+          for (let i = 0; i < octaves; i++) {
+              this.normConst += ampl;
+              ampl *= falloff;
+          }
+          this.permutation = [];
+          let i;
+          for (i = 0; i < 256; i++) {
+            this.permutation[i] = Math.floor(Math.random() * 256);
+          }
+          // Duplicate the permutation array
+          this.permutation = this.permutation.concat(this.permutation);
+      }
+    
+      ev(x, y) {
+          let total = 0;
+          let frequency = 1;
+          let amplitude = 1;
+          let maxValue = 0;
+          for(let i = 0; i < this.octaves; i++) {
+              total += p.noise((x + this.xOffset) * frequency / this.range, 
+                             (y + this.yOffset) * frequency / this.range) * amplitude;
+              
+              maxValue += amplitude;
+              amplitude *= this.falloff;
+              frequency *= 2;
+          }
+          return total / maxValue;
+      }
+    }
+
+
+    let pixelMapper; // PixelMapper instance, define this class or function
+    let pds; // Poisson2D instance, define this class or function
+
+    p.setup = () => {
+      p.createCanvas(width, height);
+      
+      let seed = 5325 * p.random();
+      let asp = 1 / 1.4; // Aspect ratio
+      let extent = [-1, 1, -1 / asp, 1 / asp];
+
+      pixelMapper = new PixelMapper(width, height);
+      pixelMapper.setExtentWidth(2);
+
+
+      p.noiseSeed(72 * seed);
+      let xNoise = new Perlin(5631 * seed, 0.5, 10, 0.5);
+      let yNoise = new Perlin(7242 * seed, 0.5, 10, 0.5);
+
+      let circles = generateCircles(extent, 0.25, 0.5, Math.random);
+      const nCircles = circles.length;
+
+      const warpSizeX = p.random(0.1, 1);
+      const warpSizeY = p.random(0.1, 1);
+      const numWarps = p.floor(p.random(1, 10 + 1));
+
+      function distanceFunction(pt) {
+          let [x, y] = pt;
+          let warpScale = 1;
+          for (let i = 0; i < numWarps; i++) {
+              const dx = -1 + 2 * xNoise.ev(x, y);
+              const dy = -1 + 2 * yNoise.ev(x, y);
+
+              x += warpScale * warpSizeX * dx;
+              y += warpScale * warpSizeY * dy;
+
+              warpScale *= 0.9;
+          }
+
+          for (let i = 0; i < nCircles; i++) {
+              const circ = circles[i];
+              const [cX, cY] = circ.center;
+              if (Math.hypot(cX - x, cY - y) < circ.radius) return circ.dist;
+          }
+          return 1;
+      }
+
+      // const minDistance = p.random(0.004, 0.006);
+      const minDistance = minDist;
+      const maxDistance = minDistance * p.random(5, 10);
+
+      pds = new Poisson2D({
+          extent: extent,
+          minDistance: minDistance,
+          maxDistance: maxDistance,
+          distanceFunction,
+          tries: 10,
+      }, Math.random);
+
+      
+
+      // gfx.colorMode(p.HSL, 1);
+      // console.log(state.BG_mode)
+      // if (state.BG_mode === 'image') 
+      //     p.background(0, 0, 0, 0);
+      // else if (state.BG_mode === 'color')
+      //     p.background(backgroundColor); 
+  };
+
+  p.draw = () => {
+      let pointFill = foregroundColor;
+      p.stroke(pointFill);
+      // p.strokeWeight(s / 300);
+      p.strokeWeight(dotSize);
+
+      for (let i = 0; i < 100; i++) {
+          let pt = pds.next();
+          let d = pds.getLastDistance();
+          let dCbrt = Math.pow(d, 1/3);
+          if (!pt) {
+                  p.noLoop();
+                  return;
+          }
+          
+          let idx = Math.floor(dCbrt*patternDensity);
+          if (idx == 0){
+              // p.point(...pixelMapper.toPixel(...pt));
+              pt = pixelMapper.toPixel(pt[0], pt[1]);
+
+              context.fillStyle = foregroundColor;
+              let particle = new Particle(pt[0], pt[1], dotSize, foregroundColor);
+              particles.push(particle);
+              // context.fillRect(
+              //   Math.round(pt[0]) - dotSize / 2,
+              //   Math.round(pt[1]) - dotSize / 2,
+              //   dotSize,
+              //   dotSize
+              // );
+              context.beginPath(); // Start a new path
+                  context.arc(
+                      Math.round(pt[0]), // x-coordinate of the center of the circle
+                      Math.round(pt[1]), // y-coordinate of the center of the circle
+                      dotSize / 2, // Radius of the circle
+                      0, // Start angle
+                      2 * Math.PI // End angle
+                  );
+                  context.fill(); // Fill the path
+          }
+
+      }
+  };
+  }, 'myCanvas'); // 'myCanvas' might be a container ID where the canvas should be attached
+
+  // Helper functions and classes
+function generateCircles(extent, minRadius=0.1, maxRadius=2, rng) {
+  const circles = [];  
+  const pds = new Poisson2D({ extent, minDistance: 0.1 }, rng);
+
+  const centers = pds.fill();
+  const n = centers.length;
+
+  for (let i = 0; i < n; i++) {
+      const radius = minRadius + rng() * (maxRadius - minRadius);
+      const dist = Math.pow(rng(), 3); // Bias towards lower values
+      circles.push({
+          center: centers[i],
+          radius: radius,
+          dist: dist
+      });
+  }
+
+  return circles;
+}
+
+
+
+}
+class PixelMapper {
+  constructor(pixelWidth, pixelHeight) {
+      this.size = [pixelWidth, pixelHeight];
+      this.asp = pixelWidth / pixelHeight;
+      this.setFlipY(false);
+      this.setExtentWidth(2); // Default extent width
+  }
+
+  setFlipY(value) {
+      this.ySign = value ? -1 : 1;
+  }
+
+  setExtentWidth(width) {
+      this.width = width;
+      this.height = width / this.asp;
+  }
+
+  pixelToUnit(column, row) {
+      const [w, h] = this.size;
+      return [(column + 0.5) / w, (row + 0.5) / h];
+  }
+
+  unitToPixel(u, v) {
+      const [w, h] = this.size;
+      return [u * w - 0.5, v * h - 0.5];
+  }
+
+  fromPixel(column, row) {
+      let [u, v] = this.pixelToUnit(column, row);
+      let x = (u - 0.5) * this.width;
+      let y = (v - 0.5) * this.height * this.ySign;
+      return [x, y];
+  }
+
+  toPixel(x, y) {
+      if (y == undefined) y = x;
+      let u = x / this.width + 0.5;
+      let v = y * this.ySign / this.height + 0.5;
+      // console.log("xy:", x, y);
+      // console.log("uv", u, v);
+      return this.unitToPixel(u, v);
+  }
+}
+
 function drawPattern(context, width, height, dotSize, minDist, patternDensity, foregroundColor) {
       // Assuming p5SVG is globally accessible or passed into this function
-      new p5((p) => {
-        class Perlin {
-          constructor(seed, range = 1, octaves = 4, falloff = 0.5) {
-              this.xOffset = Math.random() * 1000;
-              this.yOffset = Math.random() * 1000;
-              this.range = range;
-              this.octaves = octaves;
-              this.falloff = falloff;
-        
-              this.normConst = 0;
-              let ampl = 0.5;
-              for (let i = 0; i < octaves; i++) {
-                  this.normConst += ampl;
-                  ampl *= falloff;
-              }
-              this.permutation = [];
-              let i;
-              for (i = 0; i < 256; i++) {
-                this.permutation[i] = Math.floor(Math.random() * 256);
-              }
-              // Duplicate the permutation array
-              this.permutation = this.permutation.concat(this.permutation);
-          }
-        
-          ev(x, y) {
-              let total = 0;
-              let frequency = 1;
-              let amplitude = 1;
-              let maxValue = 0;
-              for(let i = 0; i < this.octaves; i++) {
-                  total += p.noise((x + this.xOffset) * frequency / this.range, 
-                                 (y + this.yOffset) * frequency / this.range) * amplitude;
-                  
-                  maxValue += amplitude;
-                  amplitude *= this.falloff;
-                  frequency *= 2;
-              }
-              return total / maxValue;
-          }
-        }
-
-
-        let pixelMapper; // PixelMapper instance, define this class or function
-        let pds; // Poisson2D instance, define this class or function
-
-        p.setup = () => {
-          p.createCanvas(width, height);
-          
-          let seed = 5325 * p.random();
-          let asp = 1 / 1.4; // Aspect ratio
-          let extent = [-1, 1, -1 / asp, 1 / asp];
-
-          pixelMapper = new PixelMapper(width, height);
-          pixelMapper.setExtentWidth(2);
-
-
-          p.noiseSeed(72 * seed);
-          let xNoise = new Perlin(5631 * seed, 0.5, 10, 0.5);
-          let yNoise = new Perlin(7242 * seed, 0.5, 10, 0.5);
-
-          let circles = generateCircles(extent, 0.25, 0.5, Math.random);
-          const nCircles = circles.length;
-
-          const warpSizeX = p.random(0.1, 1);
-          const warpSizeY = p.random(0.1, 1);
-          const numWarps = p.floor(p.random(1, 10 + 1));
-
-          function distanceFunction(pt) {
-              let [x, y] = pt;
-              let warpScale = 1;
-              for (let i = 0; i < numWarps; i++) {
-                  const dx = -1 + 2 * xNoise.ev(x, y);
-                  const dy = -1 + 2 * yNoise.ev(x, y);
-
-                  x += warpScale * warpSizeX * dx;
-                  y += warpScale * warpSizeY * dy;
-
-                  warpScale *= 0.9;
-              }
-
-              for (let i = 0; i < nCircles; i++) {
-                  const circ = circles[i];
-                  const [cX, cY] = circ.center;
-                  if (Math.hypot(cX - x, cY - y) < circ.radius) return circ.dist;
-              }
-              return 1;
-          }
-
-          // const minDistance = p.random(0.004, 0.006);
-          const minDistance = minDist;
-          const maxDistance = minDistance * p.random(5, 10);
-
-          pds = new Poisson2D({
-              extent: extent,
-              minDistance: minDistance,
-              maxDistance: maxDistance,
-              distanceFunction,
-              tries: 10,
-          }, Math.random);
-
-          
-
-          // gfx.colorMode(p.HSL, 1);
-          // console.log(state.BG_mode)
-          // if (state.BG_mode === 'image') 
-          //     p.background(0, 0, 0, 0);
-          // else if (state.BG_mode === 'color')
-          //     p.background(backgroundColor); 
-      };
-
-      p.draw = () => {
-          let pointFill = foregroundColor;
-          p.stroke(pointFill);
-          // p.strokeWeight(s / 300);
-          p.strokeWeight(dotSize);
-
-          for (let i = 0; i < 100; i++) {
-              let pt = pds.next();
-              let d = pds.getLastDistance();
-              let dCbrt = Math.pow(d, 1/3);
-              if (!pt) {
-                      p.noLoop();
-                      return;
-              }
-              
-              let idx = Math.floor(dCbrt*patternDensity);
-              if (idx == 0){
-                  // p.point(...pixelMapper.toPixel(...pt));
-                  pt = pixelMapper.toPixel(pt[0], pt[1]);
-
-                  context.fillStyle = foregroundColor;
-                  let particle = new Particle(pt[0], pt[1], dotSize, foregroundColor);
-                  particles.push(particle);
-                  // context.fillRect(
-                  //   Math.round(pt[0]) - dotSize / 2,
-                  //   Math.round(pt[1]) - dotSize / 2,
-                  //   dotSize,
-                  //   dotSize
-                  // );
-                  context.beginPath(); // Start a new path
-                      context.arc(
-                          Math.round(pt[0]), // x-coordinate of the center of the circle
-                          Math.round(pt[1]), // y-coordinate of the center of the circle
-                          dotSize / 2, // Radius of the circle
-                          0, // Start angle
-                          2 * Math.PI // End angle
-                      );
-                      context.fill(); // Fill the path
-              }
-
-          }
-      };
-    }, 'myCanvas'); // 'myCanvas' might be a container ID where the canvas should be attached
-
+      initSketch(context, width, height, dotSize, minDist, patternDensity, foregroundColor);
 
 
 
@@ -488,73 +565,6 @@ function drawPattern(context, width, height, dotSize, minDist, patternDensity, f
 //   }
 //   // console.log("particles: ", particles.length);
 // }
-
-// Helper functions and classes
-function generateCircles(extent, minRadius=0.1, maxRadius=2, rng) {
-  const circles = [];  
-  const pds = new Poisson2D({ extent, minDistance: 0.1 }, rng);
-
-  const centers = pds.fill();
-  const n = centers.length;
-
-  for (let i = 0; i < n; i++) {
-      const radius = minRadius + rng() * (maxRadius - minRadius);
-      const dist = Math.pow(rng(), 3); // Bias towards lower values
-      circles.push({
-          center: centers[i],
-          radius: radius,
-          dist: dist
-      });
-  }
-
-  return circles;
-}
-
-
-
-}
-class PixelMapper {
-  constructor(pixelWidth, pixelHeight) {
-      this.size = [pixelWidth, pixelHeight];
-      this.asp = pixelWidth / pixelHeight;
-      this.setFlipY(false);
-      this.setExtentWidth(2); // Default extent width
-  }
-
-  setFlipY(value) {
-      this.ySign = value ? -1 : 1;
-  }
-
-  setExtentWidth(width) {
-      this.width = width;
-      this.height = width / this.asp;
-  }
-
-  pixelToUnit(column, row) {
-      const [w, h] = this.size;
-      return [(column + 0.5) / w, (row + 0.5) / h];
-  }
-
-  unitToPixel(u, v) {
-      const [w, h] = this.size;
-      return [u * w - 0.5, v * h - 0.5];
-  }
-
-  fromPixel(column, row) {
-      let [u, v] = this.pixelToUnit(column, row);
-      let x = (u - 0.5) * this.width;
-      let y = (v - 0.5) * this.height * this.ySign;
-      return [x, y];
-  }
-
-  toPixel(x, y) {
-      if (y == undefined) y = x;
-      let u = x / this.width + 0.5;
-      let v = y * this.ySign / this.height + 0.5;
-      // console.log("xy:", x, y);
-      // console.log("uv", u, v);
-      return this.unitToPixel(u, v);
-  }
 }
 
 
